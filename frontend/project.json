@@ -1,0 +1,57 @@
+{
+  "id": "gb-0050",
+  "direction": "因子核算与分发",
+  "title": "棠原试验室碳因子结算册",
+  "slug": "carbon-factors",
+  "algorithm": "单位转换、因子版本冻结、用量×因子与部门透视",
+  "entities": "Activity / EmissionFactor / CarbonRun / Review / DeliverySchedule",
+  "scenario": "合成用电/燃料/出行活动→因子核算与差异说明→站内周期结算；范围声明与缺因子拒绝",
+  "visual": "因子样本册、松绿赤陶",
+  "oracle": "kWh/MWh单位换算手算；缺单位因子拒绝；因子更新旧报告不变",
+  "frontend": 18254,
+  "backend": 19254,
+  "db_port": 17754,
+  "database": "PostgreSQL16",
+  "batch": 2,
+  "label": "活动用量",
+  "policy_label": "核算因子版本",
+  "fields": {
+    "period": "月份",
+    "department": "研究部门",
+    "activity": "活动类型",
+    "quantity": "活动量",
+    "unit": "单位"
+  },
+  "example": {
+    "period": "2026-11",
+    "department": "材料试验室",
+    "activity": "电力",
+    "quantity": 1.5,
+    "unit": "MWh"
+  },
+  "policy": {
+    "version": "因子-v1",
+    "scope": "合成研究用活动量；仅覆盖电力、柴油、通勤，不是组织完整碳盘查",
+    "factors": {
+      "电力": {
+        "unit": "kWh",
+        "kg_per_unit": 0.57
+      },
+      "柴油": {
+        "unit": "L",
+        "kg_per_unit": 2.68
+      },
+      "通勤": {
+        "unit": "km",
+        "kg_per_unit": 0.12
+      }
+    }
+  },
+  "colors": [
+    "0.94 0.025 120",
+    "0.28 0.055 160",
+    "0.53 0.12 42"
+  ],
+  "caption": "活动量 × 因子 · 单位与范围随报告保存",
+  "unit": "kgCO₂e"
+}
