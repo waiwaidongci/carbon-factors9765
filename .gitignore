@@ -31,3 +31,5 @@ target/
 *.o
 *.obj
 .DS_Store
+.pydeps/
+green_local.db*

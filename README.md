@@ -52,3 +52,15 @@ MIT License。
 来源记录（Source，专属业务字段校验）、口径版本（Policy）、核算报告（Run）、交付计划（Schedule）、交付（Delivery）均经数据库→模型→请求schema→service→route/controller→frontend API→store→page。Period为已有来源期间字典，在任务期间选择器使用；不单独作为复杂度计数。底稿JSON为小型多字段单记录存储，不虚构未落库的子实体。
 
 实际表：期间字典 activity_periods；专属来源 activities；冻结口径 emission_factors；异步报告 carbon_runs。
+
+## 限额绿电凭证用电核算（green 模块）
+
+绿电凭证按 凭证编号、适用月份、适用部门、凭证排放因子(kgCO₂e/kWh)、登记电量(kWh) 登记，余额跨报告共用。用电报告登记 月份、部门、用电量、电网因子。仅当凭证与报告的月份、部门同时匹配时该凭证才可用于该报告。
+
+分配目标为字典序：①先最大化被绿电覆盖的电量；②在覆盖最大的前提下最小化总排放。算法在 `backend/src/services/mcmf.py` 用最小费用最大流一次求解（费用=凭证因子−电网因子），不是逐条贪心；`exhaustive.py` 提供小规模穷举 oracle，`scripts/verify_green.py` 与 `tests/` 用穷举对照验证最优解（逐条贪心在“最小化排放”上会漏配，测试有反例）。
+
+事务与额度生命周期：发起核算即排队，冻结底稿、因子与最优分配（保存 SHA256）并**预占额度**（余额立即扣减，写 green_reservations 与 reserve 流水）；worker 认领（claim，条件更新做围栏）后计算，**成功才核销**（预占转正、删除预占行、写 consume，余额不再变动）；**失败或取消则释放**（余额还原、写 release）。已完成报告与交付保留原分配，不可重新核算。
+
+可靠性：`green_reports.attempt` 为行版本围栏，旧执行者晚到、消息重试/重复投递均无法重复扣额（claim/run 条件不匹配即跳过）。worker 认领后崩溃由看门狗 `recover_stale`（心跳超时）释放旧预占并按当前余额重新排队，余额同成同败。并发排队在 PostgreSQL 用 `pg_advisory_xact_lock`、SQLite 用进程内 RLock + `BEGIN IMMEDIATE` 串行化。额度恒等式 `登记额−可用余额 = 在途预占 + 已核销` 由 `/green/conservation` 与核销前守恒校验保证，全部余额变动落 `green_ledger` 流水可逐条追查。Redis 不可用时绿电任务自动回退数据库轮询。
+
+新增表：green_certificates、green_reports、green_reservations、green_ledger（启动 create_all 自动建表，详见 backend/migrations/001_schema.md）。前端“绿电凭证核算”页可登记凭证、登记用电并发起/取消核算、追查每张凭证余额、每份报告的预占/核销分配与完整额度流水。穷举与守恒验证：`cd backend && PYTHONPATH=.pydeps python3 -m scripts.verify_green`，单测 `python3 -m unittest discover -s tests`。
